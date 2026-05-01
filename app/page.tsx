@@ -1,0 +1,147 @@
+'use client';
+import { useState } from 'react';
+
+export default function Home() {
+  const [image, setImage] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [productName, setProductName] = useState('');
+  const [productLink, setProductLink] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [pinData, setPinData] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setPreview(result);
+      setImage(result.split(',')[1]);
+      setPinData(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const generate = async () => {
+    if (!image) return;
+    setLoading(true);
+    setPinData(null);
+    try {
+      const res = await fetch('/api/generate-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: image, productName, productLink })
+      });
+      const data = await res.json();
+      setPinData(data);
+    } catch (e) {
+      alert('Errore. Riprova.');
+    }
+    setLoading(false);
+  };
+
+  const copyAll = () => {
+    if (!pinData) return;
+    const tags = pinData.hashtags.map((t: string) => t.startsWith('#') ? t : '#' + t).join(' ');
+    const text = `BACHECA: ${pinData.board}\n\nTITOLO: ${pinData.title}\n\nDESCRIZIONE: ${pinData.description}\n\nHASHTAG: ${tags}${productLink ? '\n\nLINK: ' + productLink : ''}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  const s = {
+    container: { maxWidth: 600, margin: '0 auto', padding: '24px 16px', fontFamily: 'system-ui, sans-serif' },
+    header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 },
+    title: { fontSize: 24, fontWeight: 700, margin: 0 },
+    badge: { background: '#E60023', color: 'white', padding: '3px 10px', borderRadius: 20, fontSize: 12 },
+    uploadLabel: { display: 'block', border: '2px dashed #ddd', borderRadius: 12, textAlign: 'center' as const, cursor: 'pointer', overflow: 'hidden', marginBottom: 16 },
+    uploadInner: { padding: 40 },
+    uploadIcon: { fontSize: 40 },
+    uploadText: { fontWeight: 600, marginTop: 8 },
+    uploadHint: { color: '#888', fontSize: 13, marginTop: 4 },
+    img: { width: '100%', maxHeight: 360, objectFit: 'cover' as const, display: 'block' },
+    input: { width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 10, fontSize: 14, marginBottom: 10, boxSizing: 'border-box' as const, fontFamily: 'system-ui' },
+    btnGenerate: { width: '100%', background: '#E60023', color: 'white', border: 'none', padding: 16, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer', marginBottom: 24 },
+    results: { border: '1px solid #eee', borderRadius: 16, overflow: 'hidden', marginTop: 8 },
+    resultsHeader: { background: '#1A1A1A', color: 'white', padding: '12px 20px', fontSize: 13, fontWeight: 600 },
+    field: { padding: '16px 20px', borderBottom: '1px solid #f0f0f0' },
+    fieldLabel: { fontSize: 11, fontWeight: 600, color: '#888', letterSpacing: '0.08em', marginBottom: 8 },
+    fieldValue: { fontSize: 14, lineHeight: 1.5, background: '#fafafa', padding: '10px 12px', borderRadius: 8 },
+    btnCopy: { width: '100%', border: 'none', padding: 14, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 10 },
+    btnPinterest: { display: 'block', background: '#E60023', color: 'white', textAlign: 'center' as const, padding: 14, borderRadius: 10, fontSize: 14, fontWeight: 600, textDecoration: 'none' },
+  };
+
+  return (
+    <main style={s.container}>
+      <div style={s.header}>
+        <h1 style={s.title}>BeKreative</h1>
+        <span style={s.badge}>📌 Pinterest</span>
+      </div>
+
+      <label style={s.uploadLabel}>
+        <input type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
+        {preview ? (
+          <img src={preview} style={s.img} alt="preview" />
+        ) : (
+          <div style={s.uploadInner}>
+            <div style={s.uploadIcon}>🖼️</div>
+            <div style={s.uploadText}>Carica foto prodotto o ambientazione</div>
+            <div style={s.uploadHint}>JPG, PNG, WEBP</div>
+          </div>
+        )}
+      </label>
+
+      {image && (
+        <>
+          <input
+            type="text"
+            placeholder="Nome prodotto (es. Vaso Pappagalli Jolipa)"
+            value={productName}
+            onChange={e => setProductName(e.target.value)}
+            style={s.input}
+          />
+          <input
+            type="url"
+            placeholder="Link prodotto (https://www.bekreative.it/...)"
+            value={productLink}
+            onChange={e => setProductLink(e.target.value)}
+            style={{ ...s.input, marginBottom: 16 }}
+          />
+          <button onClick={generate} disabled={loading} style={{ ...s.btnGenerate, opacity: loading ? 0.7 : 1 }}>
+            {loading ? '⏳ Generando...' : '✨ Genera contenuto Pinterest'}
+          </button>
+        </>
+      )}
+
+      {pinData && (
+        <div style={s.results}>
+          <div style={s.resultsHeader}>📌 PIN PRONTO</div>
+          {[
+            { label: 'BACHECA', value: pinData.board },
+            { label: 'TITOLO', value: pinData.title },
+            { label: 'DESCRIZIONE', value: pinData.description },
+            { label: 'HASHTAG', value: pinData.hashtags.map((t: string) => t.startsWith('#') ? t : '#' + t).join(' ') },
+            ...(productLink ? [{ label: 'LINK', value: productLink }] : [])
+          ].map(({ label, value }) => (
+            <div key={label} style={s.field}>
+              <div style={s.fieldLabel}>{label}</div>
+              <div style={s.fieldValue}>{value}</div>
+            </div>
+          ))}
+          <div style={{ padding: 20 }}>
+            <button
+              onClick={copyAll}
+              style={{ ...s.btnCopy, background: copied ? '#2D6A4F' : '#1A1A1A', color: 'white' }}
+            >
+              {copied ? '✓ Copiato!' : '📋 Copia tutto'}
+            </button>
+            <a href="https://pinterest.com/pin/creation/button/" target="_blank" style={s.btnPinterest}>
+              📌 Apri Pinterest
+            </a>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
