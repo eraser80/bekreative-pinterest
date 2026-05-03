@@ -38,7 +38,7 @@ Rispondi SOLO con JSON valido senza markdown:
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-opus-4-5',
         max_tokens: 1000,
         messages: [{
           role: 'user',
@@ -54,11 +54,30 @@ Rispondi SOLO con JSON valido senza markdown:
     });
 
     const data = await response.json();
+
+    // Controllo errore API
+    if (!response.ok || !data.content || !data.content[0]) {
+      console.error('API error:', JSON.stringify(data));
+      return NextResponse.json({ 
+        error: `Errore API: ${data.error?.message || 'risposta non valida'}` 
+      }, { status: 500 });
+    }
+
     const text = data.content[0].text.trim();
     const clean = text.replace(/```json\n?|```\n?/g, '').trim();
-    const pinData = JSON.parse(clean);
+    
+    let pinData;
+    try {
+      pinData = JSON.parse(clean);
+    } catch {
+      console.error('JSON parse error:', text);
+      return NextResponse.json({ 
+        error: 'Risposta AI non valida' 
+      }, { status: 500 });
+    }
 
     return NextResponse.json(pinData);
+
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Errore generazione' }, { status: 500 });
