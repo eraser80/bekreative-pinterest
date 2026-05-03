@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+function getMediaType(base64: string): string {
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBOR')) return 'image/png';
+  if (base64.startsWith('R0lGO')) return 'image/gif';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  return 'image/jpeg';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { imageBase64, productName, productLink } = await request.json();
@@ -30,6 +38,8 @@ Rispondi SOLO con JSON valido senza markdown:
   "hashtags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8"]
 }`;
 
+    const mediaType = getMediaType(imageBase64);
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -45,7 +55,7 @@ Rispondi SOLO con JSON valido senza markdown:
           content: [
             {
               type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 }
+              source: { type: 'base64', media_type: mediaType, data: imageBase64 }
             },
             { type: 'text', text: prompt }
           ]
@@ -55,24 +65,23 @@ Rispondi SOLO con JSON valido senza markdown:
 
     const data = await response.json();
 
-    // Controllo errore API
     if (!response.ok || !data.content || !data.content[0]) {
       console.error('API error:', JSON.stringify(data));
-      return NextResponse.json({ 
-        error: `Errore API: ${data.error?.message || 'risposta non valida'}` 
+      return NextResponse.json({
+        error: `Errore API: ${data.error?.message || 'risposta non valida'}`
       }, { status: 500 });
     }
 
     const text = data.content[0].text.trim();
     const clean = text.replace(/```json\n?|```\n?/g, '').trim();
-    
+
     let pinData;
     try {
       pinData = JSON.parse(clean);
     } catch {
       console.error('JSON parse error:', text);
-      return NextResponse.json({ 
-        error: 'Risposta AI non valida' 
+      return NextResponse.json({
+        error: 'Risposta AI non valida'
       }, { status: 500 });
     }
 
